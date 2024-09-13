@@ -22,7 +22,180 @@ variable "resource_group_name" {
   description = "The resource group where the resources will be deployed."
 }
 
-# required AVM interfaces
+variable "sku_name" {
+  type        = string
+  description = "SKU name of the WAF Policy. Possible values are 'Standard_AzureFrontDoor' and 'Premium_AzureFrontDoor'."
+  validation {
+    condition     = can(index(["Standard_AzureFrontDoor", "Premium_AzureFrontDoor"], var.sku_name))
+    error_message = "The SKU name must be either 'Standard_AzureFrontDoor' or 'Premium_AzureFrontDoor'."
+  }
+}
+
+variable "enabled" {
+  type        = bool
+  default     = true
+  description = "Indicates whether the WAF Policy is enabled or disabled. Default is true."
+}
+
+variable "mode" {
+  type        = string
+  description = "The mode of the WAF Policy. Possible values are 'Detection' and 'Prevention'."
+  validation {
+    condition     = can(index(["Detection", "Prevention"], var.mode))
+    error_message = "The mode must be either 'Detection' or 'Prevention'."
+  }
+}
+
+variable "request_body_check_enabled" {
+  type        = bool
+  default     = true
+  description = "Indicates whether to enable request body check. Default is true."
+}
+
+variable "redirect_url" {
+  type        = string
+  description = "The redirect URL for the WAF Policy."
+  validation {
+    condition     = var.redirect_url != "" && can(regex("https?://[a-zA-Z0-9-]+\\.[a-zA-Z0-9-]+", var.redirect_url))
+    error_message = "The redirect URL must be a valid URL."
+  }
+}
+
+variable "custom_block_response_body" {
+  type        = optional(string)
+  description = "The custom block response body. If the action type is block, customer can override the response body setting this varibale. The body must be specified in base64 encoding"
+}
+
+variable "custom_block_response_status_code" {
+  type        = optional(number)
+  description = "Customer can override the response status code setting this varibale. If a custom rule block's action is block, this is the response status code. Possible values are 200, 403, 405, 406, 429"
+
+  validation {
+    condition     = can(index([200, 403, 405, 406, 429], var.custom_block_response_status_code))
+    error_message = "The custom block response status code must be one of 200, 403, 405, 406, 429"
+  }
+}
+
+variable "custom_rules" {
+  type = list(object({
+    name                           = string               # Required
+    priority                       = number               # Required
+    type                           = string               # Must be "MatchRule" or "RateLimitRule"
+    action                         = string               # Must be "Allow", "Block", "Log", "Redirect"
+    enabled                        = optional(bool, true) # Default is true
+    rate_limit_duration_in_minutes = optional(number, 1)  # Default is 1
+    rate_limit_threshold           = optional(number, 10) # Default is 10
+    match_conditions = list(object({
+      match_variable     = string                 #Required, must be one of these values  "Cookies", "PostArgs", "QueryStrings", "RemoteAddr", "RequestBody" "RequestHeader", "RequestMethod", "RequestUri", "SocketAddr"
+      operator           = string                 #(Required) Comparison type to use for matching with the variable value. Possible values are Any, BeginsWith, Contains, EndsWith, Equal, GeoMatch, GreaterThan, GreaterThanOrEqual, IPMatch, LessThan, LessThanOrEqual or RegEx
+      match_values       = list(string)           # Required Up to 600 possible values to match. Limit is in total across all match_condition blocks and match_values arguments. String value itself can be up to 256 characters in length
+      selector           = optional(string, null) # (Optional) Match against a specific key if the match_variable is QueryString, PostArgs, RequestHeader or Cookies.
+      negation_condition = bool                   #(Optional) Should the result of the condition be negated.
+      transforms         = optional(list, [])     #(Optional) Up to 5 transforms to apply. Possible values are Lowercase, RemoveNulls, Trim, Uppercase, URLDecode or URLEncode.
+    }))
+  }))
+  default     = []
+  description = "A list of custom rules to be applied to the WAF Policy."
+
+  validation {
+    condition = (
+      # Ensure total number of match_values does not exceed 600
+      length(flatten([
+        for rule in var.custom_rules : [
+          for condition in rule.match_conditions : condition.match_values
+        ]
+      ])) <= 600
+      ) && all([
+        for rule in var.custom_rules : (
+          # Validate 'type' field
+          contains(["MatchRule", "RateLimitRule"], rule.type) &&
+          # Validate 'action' field
+          contains(["Allow", "Block", "Log", "Redirect"], rule.action) &&
+          # Conditional validation for 'RateLimitRule' type
+          (
+            rule.type != "RateLimitRule" || (
+              rule.rate_limit_duration_in_minutes != null &&
+              rule.rate_limit_threshold != null
+            )
+          ) &&
+          # Validate 'match_conditions' is not empty
+          length(rule.match_conditions) > 0 &&
+          # Validate each 'match_condition'
+          all([
+            for condition in rule.match_conditions : (
+              # Validate 'match_variable'
+              contains([
+                "Cookies",
+                "PostArgs",
+                "QueryStrings",
+                "RemoteAddr",
+                "RequestBody",
+                "RequestHeader",
+                "RequestMethod",
+                "RequestUri",
+                "SocketAddr"
+              ], condition.match_variable) &&
+              # Validate 'operator'
+              contains([
+                "Any",
+                "BeginsWith",
+                "Contains",
+                "EndsWith",
+                "Equal",
+                "GeoMatch",
+                "GreaterThan",
+                "GreaterThanOrEqual",
+                "IPMatch",
+                "LessThan",
+                "LessThanOrEqual",
+                "RegEx"
+              ], condition.operator) &&
+              # Validate 'match_values' is not empty and each value is ≤ 256 characters
+              length(condition.match_values) > 0 &&
+              all([
+                for value in condition.match_values : length(value) <= 256
+              ]) &&
+              # Conditional validation for 'selector'
+              (
+                contains([
+                  "QueryStrings",
+                  "PostArgs",
+                  "RequestHeader",
+                  "Cookies"
+                ], condition.match_variable) ?
+                condition.selector != null :
+                true
+              ) &&
+              # Validate 'transforms' length and values
+              length(condition.transforms) <= 5 &&
+              all([
+                for transform in condition.transforms : contains([
+                  "Lowercase",
+                  "RemoveNulls",
+                  "Trim",
+                  "Uppercase",
+                  "URLDecode",
+                  "URLEncode"
+                ], transform)
+              ])
+            )
+          ])
+        )
+    ])
+    error_message = "Validation failed for 'custom_rules'. Please ensure all rules and conditions meet the required criteria."
+  }
+
+
+}
+
+//custom rule
+//managed rule
+//log scrubbing
+
+
+
+
+####################### Required AVM interfaces
 # remove only if not supported by the resource
 # tflint-ignore: terraform_unused_declarations
 variable "customer_managed_key" {
