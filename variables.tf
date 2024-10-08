@@ -5,14 +5,12 @@ variable "location" {
 }
 
 variable "name" {
-  type        = string
+  type        = string #Name can be only lowercase letters, numbers, no spaces, and between 1 and 80 characters long.
   description = "The name of the this resource."
 
   validation {
-    condition     = can(regex("TODO", var.name))
-    error_message = "The name must be TODO." # TODO remove the example below once complete:
-    #condition     = can(regex("^[a-z0-9]{5,50}$", var.name))
-    #error_message = "The name must be between 5 and 50 characters long and can only contain lowercase letters and numbers."
+    condition     = can(regex("^[a-z0-9]{1,80}$", var.name))
+    error_message = "The name can only contain lowercase letters and numbers, no spaces, and must be between 1 and 80 characters long."
   }
 }
 
@@ -54,24 +52,32 @@ variable "request_body_check_enabled" {
 
 variable "redirect_url" {
   type        = string
-  description = "The redirect URL for the WAF Policy."
+  default     = null
+  description = "Optional. The redirect URL for the WAF Policy."
   validation {
-    condition     = var.redirect_url != "" && can(regex("https?://[a-zA-Z0-9-]+\\.[a-zA-Z0-9-]+", var.redirect_url))
+    condition     = var.redirect_url == null || var.redirect_url == "" || can(regex("https?://[a-zA-Z0-9-]+\\.[a-zA-Z0-9-]+", var.redirect_url))
     error_message = "The redirect URL must be a valid URL."
   }
 }
 
 variable "custom_block_response_body" {
-  type        = optional(string)
-  description = "The custom block response body. If the action type is block, customer can override the response body setting this varibale. The body must be specified in base64 encoding"
+  type        = string
+  default     = null
+  description = "Optional. The custom block response body. If the action type is block, customer can override the response body setting this varibale. The body must be specified in base64 encoding"
+
+  validation {
+    condition     = can(regex("^[A-Za-z0-9+/=]+$", var.custom_block_response_body))
+    error_message = "The string must be a valid base64-encoded value."
+  }
 }
 
 variable "custom_block_response_status_code" {
-  type        = optional(number)
-  description = "Customer can override the response status code setting this varibale. If a custom rule block's action is block, this is the response status code. Possible values are 200, 403, 405, 406, 429"
+  type        = number
+  default     = null
+  description = "Optional. Customer can override the response status code setting this varibale. If a custom rule block's action is block, this is the response status code. Possible values are 200, 403, 405, 406, 429"
 
   validation {
-    condition     = can(index([200, 403, 405, 406, 429], var.custom_block_response_status_code))
+    condition     = var.custom_block_response_status_code == null || can(index([200, 403, 405, 406, 429], var.custom_block_response_status_code))
     error_message = "The custom block response status code must be one of 200, 403, 405, 406, 429"
   }
 }
@@ -86,112 +92,128 @@ variable "custom_rules" {
     rate_limit_duration_in_minutes = optional(number, 1)  # Default is 1
     rate_limit_threshold           = optional(number, 10) # Default is 10
     match_conditions = list(object({
-      match_variable     = string                 #Required, must be one of these values  "Cookies", "PostArgs", "QueryStrings", "RemoteAddr", "RequestBody" "RequestHeader", "RequestMethod", "RequestUri", "SocketAddr"
-      operator           = string                 #(Required) Comparison type to use for matching with the variable value. Possible values are Any, BeginsWith, Contains, EndsWith, Equal, GeoMatch, GreaterThan, GreaterThanOrEqual, IPMatch, LessThan, LessThanOrEqual or RegEx
-      match_values       = list(string)           # Required Up to 600 possible values to match. Limit is in total across all match_condition blocks and match_values arguments. String value itself can be up to 256 characters in length
-      selector           = optional(string, null) # (Optional) Match against a specific key if the match_variable is QueryString, PostArgs, RequestHeader or Cookies.
-      negation_condition = bool                   #(Optional) Should the result of the condition be negated.
-      transforms         = optional(list, [])     #(Optional) Up to 5 transforms to apply. Possible values are Lowercase, RemoveNulls, Trim, Uppercase, URLDecode or URLEncode.
+      match_variable     = string                     #Required, must be one of these values  "Cookies", "PostArgs", "QueryStrings", "RemoteAddr", "RequestBody" "RequestHeader", "RequestMethod", "RequestUri", "SocketAddr"
+      operator           = string                     #(Required) Comparison type to use for matching with the variable value. Possible values are Any, BeginsWith, Contains, EndsWith, Equal, GeoMatch, GreaterThan, GreaterThanOrEqual, IPMatch, LessThan, LessThanOrEqual or RegEx
+      match_values       = list(string)               # Required Up to 600 possible values to match. Limit is in total across all match_condition blocks and match_values arguments. String value itself can be up to 256 characters in length
+      selector           = optional(string, null)     # (Optional) Match against a specific key if the match_variable is QueryString, PostArgs, RequestHeader or Cookies.
+      negation_condition = optional(bool, null)       #(Optional) Should the result of the condition be negated.
+      transforms         = optional(list(string), []) #(Optional) Up to 5 transforms to apply. Possible values are Lowercase, RemoveNulls, Trim, Uppercase, URLDecode or URLEncode.
     }))
   }))
-  default     = []
-  description = "A list of custom rules to be applied to the WAF Policy."
-
-  validation {
-    condition = (
-      # Ensure total number of match_values does not exceed 600
-      length(flatten([
-        for rule in var.custom_rules : [
-          for condition in rule.match_conditions : condition.match_values
-        ]
-      ])) <= 600
-      ) && all([
-        for rule in var.custom_rules : (
-          # Validate 'type' field
-          contains(["MatchRule", "RateLimitRule"], rule.type) &&
-          # Validate 'action' field
-          contains(["Allow", "Block", "Log", "Redirect"], rule.action) &&
-          # Conditional validation for 'RateLimitRule' type
-          (
-            rule.type != "RateLimitRule" || (
-              rule.rate_limit_duration_in_minutes != null &&
-              rule.rate_limit_threshold != null
-            )
-          ) &&
-          # Validate 'match_conditions' is not empty
-          length(rule.match_conditions) > 0 &&
-          # Validate each 'match_condition'
-          all([
-            for condition in rule.match_conditions : (
-              # Validate 'match_variable'
-              contains([
-                "Cookies",
-                "PostArgs",
-                "QueryStrings",
-                "RemoteAddr",
-                "RequestBody",
-                "RequestHeader",
-                "RequestMethod",
-                "RequestUri",
-                "SocketAddr"
-              ], condition.match_variable) &&
-              # Validate 'operator'
-              contains([
-                "Any",
-                "BeginsWith",
-                "Contains",
-                "EndsWith",
-                "Equal",
-                "GeoMatch",
-                "GreaterThan",
-                "GreaterThanOrEqual",
-                "IPMatch",
-                "LessThan",
-                "LessThanOrEqual",
-                "RegEx"
-              ], condition.operator) &&
-              # Validate 'match_values' is not empty and each value is ≤ 256 characters
-              length(condition.match_values) > 0 &&
-              all([
-                for value in condition.match_values : length(value) <= 256
-              ]) &&
-              # Conditional validation for 'selector'
-              (
-                contains([
-                  "QueryStrings",
-                  "PostArgs",
-                  "RequestHeader",
-                  "Cookies"
-                ], condition.match_variable) ?
-                condition.selector != null :
-                true
-              ) &&
-              # Validate 'transforms' length and values
-              length(condition.transforms) <= 5 &&
-              all([
-                for transform in condition.transforms : contains([
-                  "Lowercase",
-                  "RemoveNulls",
-                  "Trim",
-                  "Uppercase",
-                  "URLDecode",
-                  "URLEncode"
-                ], transform)
-              ])
-            )
-          ])
-        )
-    ])
-    error_message = "Validation failed for 'custom_rules'. Please ensure all rules and conditions meet the required criteria."
-  }
+  default = []
 
 
+
+
+
+
+  description = <<DESCRIPTION
+A list of custom rules to be applied to the WAF (Web Application Firewall) Policy.
+
+Each custom rule object in the list must include:
+
+- **name** (string, required): The name of the custom rule.
+
+- **priority** (number, required): The priority of the custom rule. Lower numbers indicate higher priority.
+
+- **type** (string, required): The type of the custom rule. Must be one of:
+  - "MatchRule"
+  - "RateLimitRule"
+
+- **action** (string, required): The action to take when the rule matches. Must be one of:
+  - "Allow"
+  - "Block"
+  - "Log"
+  - "Redirect"
+
+- **enabled** (bool, optional): Whether the rule is enabled. Defaults to `true`.
+
+- **rate_limit_duration_in_minutes** (number, optional): The duration of the rate limit in minutes. Required if `type` is "RateLimitRule". Defaults to `1`.
+
+- **rate_limit_threshold** (number, optional): The threshold of the rate limit. Required if `type` is "RateLimitRule". Defaults to `10`.
+
+- **match_conditions** (list of objects, required): A list of match conditions for the rule.
+
+Each match condition object must include:
+
+- **match_variable** (string, required): The variable to match against. Must be one of:
+  - "Cookies"
+  - "PostArgs"
+  - "QueryStrings"
+  - "RemoteAddr"
+  - "RequestBody"
+  - "RequestHeader"
+  - "RequestMethod"
+  - "RequestUri"
+  - "SocketAddr"
+
+- **operator** (string, required): The comparison type to use for matching with the variable value. Must be one of:
+  - "Any"
+  - "BeginsWith"
+  - "Contains"
+  - "EndsWith"
+  - "Equal"
+  - "GeoMatch"
+  - "GreaterThan"
+  - "GreaterThanOrEqual"
+  - "IPMatch"
+  - "LessThan"
+  - "LessThanOrEqual"
+  - "RegEx"
+
+- **match_values** (list of strings, required): The values to match against. Up to **600** possible values across all `match_conditions` and `match_values` in all rules. Each string can be up to **256** characters in length.
+
+- **selector** (string, optional): Required if `match_variable` is one of "QueryStrings", "PostArgs", "RequestHeader", or "Cookies". Specifies the key to match against.
+
+- **negation_condition** (bool, optional): Whether to negate the result of the condition. Defaults to `false`.
+
+- **transforms** (list of strings, optional): Up to **5** transforms to apply. Each must be one of:
+  - "Lowercase"
+  - "RemoveNulls"
+  - "Trim"
+  - "Uppercase"
+  - "URLDecode"
+  - "URLEncode"
+
+DESCRIPTION
 }
 
-//custom rule
-//managed rule
-//log scrubbing
 
+variable "managed_rules" {
+  type = list(object({
+    type    = string                    # (Required) The type of the managed rule. Possible values are "DefaultRuleSet" and "Microsoft_DefaultRuleSet", "BotProtection", "Microsoft_BotManagerRuleSet"
+    action  = string                    # (Required) The action to perform for all DRS rules when the managed rule is matched or when the anomaly score is 5 or greater depending on which version of the DRS you are using. Possible values include Allow, Log, Block, and Redirect
+    version = string                    # (Required) The version of the managed rule set to use. Possible values depends on which DRS type you are using, for the DefaultRuleSet type the possible values include 1.0 or preview-0.1. For Microsoft_DefaultRuleSet the possible values include 1.1, 2.0 or 2.1. For BotProtection the value must be preview-0.1 and for Microsoft_BotManagerRuleSet the value must be 1.0.
+    exclusions = optional(list(object({ # (Optional) A list of Exclusion blocks.
+      match_variable = string           # (Required) (Required) The variable type to be excluded. Possible values are QueryStringArgNames, RequestBodyPostArgNames, RequestCookieNames, RequestHeaderNames, RequestBodyJsonArgNames. Important: RequestBodyJsonArgNames is only available on Default Rule Set (DRS) 2.0 or later
+      selector       = string           # (Required) Selector for the value in the match_variable attribute this exclusion applies to. selector must be set to * if operator is set to EqualsAny.
+      operator       = string           # (Required) Comparison operator to apply to the selector when specifying which elements in the collection this exclusion applies to. Possible values are: Equals, Contains, StartsWith, EndsWith, EqualsAny
+    })))
+
+    overrides = optional(list(object({      # (Optional) A list of Override blocks.
+      rule_group_name = string              # (Required) The name of the rule group to override.
+      rules = optional(list(object({        # (Optional) A list of Rule blocks.
+        rule_id = string                    # (Required) Identifier for the managed rule.
+        enabled = optional(bool, false)     #(Optional) Is the managed rule override enabled or disabled. Defaults to false
+        action  = string                    # (Required) The action to be applied when the managed rule matches or when the anomaly score is 5 or greater. Possible values for DRS 1.1 and below are Allow, Log, Block, and Redirect. For DRS 2.0 and above the possible values are Log or AnomalyScoring.
+        exclusions = optional(list(object({ # (Optional) A list of Exclusion blocks.
+          match_variable = string           # (Required) (Required) The variable type to be excluded. Possible values are QueryStringArgNames, RequestBodyPostArgNames, RequestCookieNames, RequestHeaderNames, RequestBodyJsonArgNames. Important: RequestBodyJsonArgNames is only available on Default Rule Set (DRS) 2.0 or later
+          selector       = string           # (Required) Selector for the value in the match_variable attribute this exclusion applies to. selector must be set to * if operator is set to EqualsAny.
+          operator       = string           # (Required) Comparison operator to apply to the selector when specifying which elements in the collection this exclusion applies to. Possible values are: Equals, Contains, StartsWith, EndsWith, EqualsAny
+        })))
+      })))
+
+
+    })))
+  }))
+
+  default = []
+
+  description = <<DESCRIPTION
+A list of managed rules to be applied to the WAF (Web Application Firewall) Policy.
+The Standard_AzureFrontDoor Front Door Firewall Policy sku may contain custom rules only. The Premium_AzureFrontDoor Front Door Firewall Policy skus may contain both custom and managed rules.
+  DESCRIPTION
+}
 
 
 
