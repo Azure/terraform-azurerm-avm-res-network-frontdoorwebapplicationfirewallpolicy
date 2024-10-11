@@ -397,6 +397,20 @@ managed_rules = [
         operator       = "Contains"
       }
     ]
+
+    overrides = [{
+        rule_group_name = "PHP"
+        rules = [{
+          rule_id = "933100"
+          enabled = false
+          action  = "AnomalyScoring"
+          },
+          {
+            rule_id = "933110"
+            enabled = true
+            action  = "AnomalyScoring"
+        }]
+      }]
   }
 ]
 ``` 

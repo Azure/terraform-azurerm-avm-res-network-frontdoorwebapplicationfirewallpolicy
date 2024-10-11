@@ -63,8 +63,9 @@ resource "random_string" "suffix" {
 
 # Create a WAF policy in its simplest form
 module "test" {
-  source  = "Azure/avm-res-network-frontdoorapplicationfirewallpolicy/azurerm"
-  version = "0.1.0"
+  source = "../.."
+  # source  = "Azure/avm-res-network-frontdoorapplicationfirewallpolicy/azurerm"
+  # version = "0.1.0"
 
   name                = "mywafpolicy${random_string.suffix.result}"
   resource_group_name = azurerm_resource_group.this.name
@@ -118,9 +119,9 @@ Version: ~> 0.3
 
 ### <a name="module_test"></a> [test](#module\_test)
 
-Source: Azure/avm-res-network-frontdoorapplicationfirewallpolicy/azurerm
+Source: ../..
 
-Version: 0.1.0
+Version:
 
 <!-- markdownlint-disable-next-line MD041 -->
 ## Data Collection

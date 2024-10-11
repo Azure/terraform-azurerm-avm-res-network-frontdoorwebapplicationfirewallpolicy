@@ -55,8 +55,9 @@ resource "random_string" "suffix" {
 }
 
 module "test" {
-  source  = "Azure/avm-res-network-frontdoorapplicationfirewallpolicy/azurerm"
-  version = "0.1.0"
+  source = "../.."
+  # source  = "Azure/avm-res-network-frontdoorapplicationfirewallpolicy/azurerm"
+  # version = "0.1.0"
 
   name                = "mywafpolicy${random_string.suffix.result}"
   resource_group_name = azurerm_resource_group.this.name
