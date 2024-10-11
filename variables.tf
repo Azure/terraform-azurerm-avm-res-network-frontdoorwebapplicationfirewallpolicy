@@ -181,6 +181,7 @@ custom_rules = [
 ```
 
 DESCRIPTION
+  nullable    = false
 }
 
 ####################### Required AVM interfaces
