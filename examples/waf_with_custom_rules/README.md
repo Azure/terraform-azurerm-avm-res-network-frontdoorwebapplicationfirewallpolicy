@@ -1,11 +1,11 @@
 <!-- BEGIN_TF_DOCS -->
-# Default example
+# Web Application Firewall (WAF) for Azure Front Door with custom rules
 
 This deploys the module showing how to create custom rules
 
 ```hcl
 terraform {
-  required_version = ">= 1.9.2"
+  required_version = "~> 1.9"
   required_providers {
     azurerm = {
       source  = "hashicorp/azurerm"
@@ -19,7 +19,11 @@ terraform {
 }
 
 provider "azurerm" {
-  features {}
+  features {
+    resource_group {
+      prevent_deletion_if_contains_resources = false
+    }
+  }
   skip_provider_registration = true
 }
 
@@ -57,9 +61,8 @@ resource "random_string" "suffix" {
 }
 
 module "test" {
-  source = "../../"
-  # source             = "Azure/avm-<res/ptn>-<name>/azurerm"
-  # ...
+  source  = "Azure/avm-res-network-frontdoorapplicationfirewallpolicy/azurerm"
+  version = "0.1.0"
 
   name                = "mywafpolicy${random_string.suffix.result}"
   resource_group_name = azurerm_resource_group.this.name
@@ -126,7 +129,7 @@ module "test" {
 
 The following requirements are needed by this module:
 
-- <a name="requirement_terraform"></a> [terraform](#requirement\_terraform) (>= 1.9.2)
+- <a name="requirement_terraform"></a> [terraform](#requirement\_terraform) (~> 1.9)
 
 - <a name="requirement_azurerm"></a> [azurerm](#requirement\_azurerm) (~> 3.116.0)
 
@@ -164,9 +167,9 @@ Version: ~> 0.3
 
 ### <a name="module_test"></a> [test](#module\_test)
 
-Source: ../../
+Source: Azure/avm-res-network-frontdoorapplicationfirewallpolicy/azurerm
 
-Version:
+Version: 0.1.0
 
 <!-- markdownlint-disable-next-line MD041 -->
 ## Data Collection

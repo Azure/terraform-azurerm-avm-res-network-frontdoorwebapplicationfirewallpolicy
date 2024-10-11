@@ -1,5 +1,5 @@
 terraform {
-  required_version = ">= 1.9.2"
+  required_version = "~> 1.9"
   required_providers {
     azurerm = {
       source  = "hashicorp/azurerm"
@@ -13,7 +13,11 @@ terraform {
 }
 
 provider "azurerm" {
-  features {}
+  features {
+    resource_group {
+      prevent_deletion_if_contains_resources = false
+    }
+  }
   skip_provider_registration = true
 }
 
@@ -53,9 +57,8 @@ resource "random_string" "suffix" {
 
 # Create a WAF policy in its simplest form
 module "test" {
-  source = "../../"
-  # source             = "Azure/avm-<res/ptn>-<name>/azurerm"
-  # ...
+  source  = "Azure/avm-res-network-frontdoorapplicationfirewallpolicy/azurerm"
+  version = "0.1.0"
 
   name                = "mywafpolicy${random_string.suffix.result}"
   resource_group_name = azurerm_resource_group.this.name

@@ -143,6 +143,43 @@ Each match condition object must include:
   - "URLDecode"
   - "URLEncode"
 
+*Example 1: Basic Configuration with Default Rule Set*
+```hcl
+custom_rules = [
+    #custom rule 1
+    {
+      name     = "RateLimitRule1"
+      priority = 100
+      type     = "RateLimitRule"
+      action   = "Block"
+      match_conditions = [{
+        match_variable = "QueryString"
+        operator       = "Contains"
+        match_values   = ["promo"]
+        }
+      ]
+    },
+    #custom rule 2
+    {
+      name     = "GeographicRule1"
+      priority = 101
+      type     = "MatchRule"
+      action   = "Block"
+      match_conditions = [{
+        match_variable = "RemoteAddr"
+        operator       = "GeoMatch"
+        match_values   = ["MX", "AR"]
+        },
+        {
+          match_variable = "RemoteAddr"
+          operator       = "IPMatch"
+          match_values   = ["10.10.10.0/24"]
+        }
+      ]
+    }
+]
+```
+
 DESCRIPTION
 }
 
@@ -364,6 +401,7 @@ managed_rules = [
 ``` 
 
 DESCRIPTION
+  nullable    = false
 }
 
 variable "redirect_url" {

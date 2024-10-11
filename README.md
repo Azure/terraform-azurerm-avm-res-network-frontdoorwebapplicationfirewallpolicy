@@ -203,7 +203,7 @@ module "frontdoor_waf_policy" {
 
 The following requirements are needed by this module:
 
-- <a name="requirement_terraform"></a> [terraform](#requirement\_terraform) (~> 1.9.2)
+- <a name="requirement_terraform"></a> [terraform](#requirement\_terraform) (~> 1.9)
 
 - <a name="requirement_azurerm"></a> [azurerm](#requirement\_azurerm) (>= 3.116.0, < 5.0)
 
@@ -340,6 +340,43 @@ Each match condition object must include:
   - "Uppercase"
   - "URLDecode"
   - "URLEncode"
+
+*Example 1: Basic Configuration with Default Rule Set*
+```hcl
+custom_rules = [
+    #custom rule 1
+    {
+      name     = "RateLimitRule1"
+      priority = 100
+      type     = "RateLimitRule"
+      action   = "Block"
+      match_conditions = [{
+        match_variable = "QueryString"
+        operator       = "Contains"
+        match_values   = ["promo"]
+        }
+      ]
+    },
+    #custom rule 2
+    {
+      name     = "GeographicRule1"
+      priority = 101
+      type     = "MatchRule"
+      action   = "Block"
+      match_conditions = [{
+        match_variable = "RemoteAddr"
+        operator       = "GeoMatch"
+        match_values   = ["MX", "AR"]
+        },
+        {
+          match_variable = "RemoteAddr"
+          operator       = "IPMatch"
+          match_values   = ["10.10.10.0/24"]
+        }
+      ]
+    }
+]
+```
 
 Type:
 
