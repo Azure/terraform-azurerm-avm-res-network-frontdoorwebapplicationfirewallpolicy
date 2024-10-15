@@ -1,7 +1,7 @@
 <!-- BEGIN_TF_DOCS -->
-# Default example
+# Web Application Firewall (WAF) for Azure Front Door with custom rules
 
-This deploys the module in its simplest form. The configuration ensures that resources are named according to the Cloud Adoption Framework (CAF) naming conventions and are tagged appropriately.
+This deploys the module showing how to create custom rules
 
 ```hcl
 terraform {
@@ -29,13 +29,13 @@ provider "azurerm" {
 
 
 locals {
-  enable_telemetry = true
+  enable_telemetry = true #enable_telemetry is a variable that controls whether or not telemetry is enabled for the module.
   location         = "eastus2"
   tags = {
-    scenario     = "Default"
+    scenario     = "WAF with custom rules"
     project      = "Web Application Firewall for Azure Front Door"
     createdby    = "Web Application Firewall Policy AVM"
-    hidden-title = "WAF for AFD Default configuration"
+    hidden-title = "WAF for AFD with custom rules"
     delete       = "yes"
   }
 }
@@ -60,8 +60,6 @@ resource "random_string" "suffix" {
   upper   = false
 }
 
-
-# Create a WAF policy in its simplest form
 module "test" {
   source = "../.."
   # source  = "Azure/avm-res-network-frontdoorapplicationfirewallpolicy/azurerm"
@@ -70,9 +68,60 @@ module "test" {
   name                = "mywafpolicy${random_string.suffix.result}"
   resource_group_name = azurerm_resource_group.this.name
   enable_telemetry    = local.enable_telemetry
+  mode                = "Prevention"
+  sku_name            = "Premium_AzureFrontDoor"
 
-  mode     = "Prevention"
-  sku_name = "Premium_AzureFrontDoor"
+  request_body_check_enabled        = true
+  redirect_url                      = "https://learn.microsoft.com/docs/"
+  custom_block_response_status_code = 405
+  custom_block_response_body        = base64encode("Blocked by Azure WAF")
+
+  custom_rules = [
+    #custom rule 1
+    {
+      name     = "RateLimitRule1"
+      priority = 100
+      type     = "RateLimitRule"
+      action   = "Block"
+      match_conditions = [{
+        match_variable = "QueryString"
+        operator       = "Contains"
+        match_values   = ["promo"]
+        }
+      ]
+    },
+    #custom rule 2
+    {
+      name     = "GeographicRule1"
+      priority = 101
+      type     = "MatchRule"
+      action   = "Block"
+      match_conditions = [{
+        match_variable = "RemoteAddr"
+        operator       = "GeoMatch"
+        match_values   = ["MX", "AR"]
+        },
+        {
+          match_variable = "RemoteAddr"
+          operator       = "IPMatch"
+          match_values   = ["10.10.10.0/24"]
+        }
+      ]
+    },
+    #custom rule 3
+    {
+      name     = "QueryStringSizeRule1"
+      priority = 102
+      type     = "MatchRule"
+      action   = "Block"
+      match_conditions = [{
+        match_variable = "RequestUri"
+        operator       = "GreaterThan"
+        match_values   = ["200"]
+        transforms     = ["UrlDecode", "Trim", "Lowercase"]
+      }]
+    }
+  ]
 }
 ```
 

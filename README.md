@@ -1,16 +1,9 @@
 <!-- BEGIN_TF_DOCS -->
-# terraform-azurerm-avm-template
+# terraform-azurerm-avm-res-network-frontdoorwebapplicationfirewallpolicy
 
-This is a template repo for Terraform Azure Verified Modules.
+# Description
 
-Things to do:
-
-1. Set up a GitHub repo environment called `test`.
-1. Configure environment protection rule to ensure that approval is required before deploying to this environment.
-1. Create a user-assigned managed identity in your test subscription.
-1. Create a role assignment for the managed identity on your test subscription, use the minimum required role.
-1. Configure federated identity credentials on the user assigned managed identity. Use the GitHub environment.
-1. Search and update TODOs within the code and remove the TODO comments once complete.
+This Terraform module creates an **Azure CDN Front Door Web Application Firewall (WAF) policy** with customizable settings. It allows you to define both **managed** and **custom rules** to enhance the security of your Azure Front Door service.
 
 > [!IMPORTANT]
 > As the overall AVM framework is not GA (generally available) yet - the CI framework and test automation is not fully functional and implemented across all supported languages yet - breaking changes are expected, and additional customer feedback is yet to be gathered and incorporated. Hence, modules **MUST NOT** be published at version `1.0.0` or higher at this time.
@@ -19,14 +12,200 @@ Things to do:
 >
 > However, it is important to note that this **DOES NOT** mean that the modules cannot be consumed and utilized. They **CAN** be leveraged in all types of environments (dev, test, prod etc.). Consumers can treat them just like any other IaC module and raise issues or feature requests against them as they learn from the usage of the module. Consumers should also read the release notes for each version, if considering updating to a more recent version of a module to see if there are any considerations or breaking changes etc.
 
+# Features
+
+- **Configurable WAF Mode**: Set the WAF policy mode to either `Detection` or `Prevention`.
+- **Custom Block Responses**: Define custom response bodies and status codes for blocked requests.
+- **Custom Rules**: Implement custom WAF rules with specific match conditions, actions, and priorities.
+- **Managed Rules**: Utilize Azure's managed rule sets with options for overrides and exclusions.
+- **Dynamic Configuration**: Leverage dynamic blocks to configure rules based on variable inputs.
+- **Tagging Support**: Add tags to your WAF policy for better resource management.
+
+# Prerequisites
+
+- **Terraform**: Install Terraform version 0.12 or later.
+- **Azure Subscription**: An active Azure subscription with the necessary permissions.
+
+# Usage
+
+An example of using the module in a Terraform configuraiton:
+
+# Usage Example
+
+Below is an example of how to utilize this Terraform module to create an Azure CDN Front Door WAF policy.
+
+## 1. Create a Terraform Configuration File
+
+Create a file named `main.tf` and include the following content:
+
+```hcl
+# Instantiate the WAF Policy Module
+module "frontdoor_waf_policy" {
+  source  = "Azure/terraform-azurerm-avm-res-network-frontdoorwebapplicationfirewallpolicy/azurerm"
+  version = "0.1.0"
+
+  name                = "mywafpolicy${random_string.suffix.result}"
+  resource_group_name = azurerm_resource_group.this.name
+  enable_telemetry    = local.enable_telemetry
+  mode                = "Prevention"
+  sku_name            = "Premium_AzureFrontDoor"
+
+  request_body_check_enabled        = true
+  redirect_url                      = "https://learn.microsoft.com/docs/"
+  custom_block_response_status_code = 405
+  custom_block_response_body        = base64encode("Blocked by WAF")
+
+  custom_rules = [
+    #custom rule 1
+    {
+      name     = "RateLimitRule1"
+      priority = 100
+      type     = "RateLimitRule"
+      action   = "Block"
+      match_conditions = [{
+        match_variable = "QueryString"
+        operator       = "Contains"
+        match_values   = ["promo"]
+        }
+      ]
+    },
+    #custom rule 2
+    {
+      name     = "GeographicRule1"
+      priority = 101
+      type     = "MatchRule"
+      action   = "Block"
+      match_conditions = [{
+        match_variable = "RemoteAddr"
+        operator       = "GeoMatch"
+        match_values   = ["MX", "AR"]
+        },
+        {
+          match_variable = "RemoteAddr"
+          operator       = "IPMatch"
+          match_values   = ["10.10.10.0/24"]
+        }
+      ]
+    },
+    #custom rule 3
+    {
+      name     = "QueryStringSizeRule1"
+      priority = 102
+      type     = "MatchRule"
+      action   = "Block"
+      match_conditions = [{
+        match_variable = "RequestUri"
+        operator       = "GreaterThan"
+        match_values   = ["200"]
+        transforms     = ["UrlDecode", "Trim", "Lowercase"]
+      }]
+    }
+  ]
+
+  managed_rules = [
+    #Managed Rule 1 - Microsoft_DefaultRuleSet
+    {
+      action  = "Block"
+      type    = "Microsoft_DefaultRuleSet"
+      version = "2.1"
+
+      #Example of exclusion
+      exclusions = [
+        {
+          match_variable = "QueryStringArgNames"
+          operator       = "Equals"
+          selector       = "not_suspicious"
+        }
+      ]
+
+      #Example of override
+      overrides = [{
+        rule_group_name = "PHP"
+        rules = [{
+          rule_id = "933100"
+          enabled = false
+          action  = "AnomalyScoring"
+          },
+          {
+            rule_id = "933110"
+            enabled = true
+            action  = "AnomalyScoring"
+        }]
+        },
+        {
+          rule_group_name = "SQLI"
+          rules = [{
+            rule_id = "942100"
+            enabled = false
+            action  = "AnomalyScoring"
+            },
+            {
+              rule_id = "942200"
+              action  = "AnomalyScoring"
+
+              exclusions = [{
+                match_variable = "QueryStringArgNames"
+                operator       = "Equals"
+                selector       = "innocent"
+              }]
+          }]
+
+          exclusions = [{
+            match_variable = "QueryStringArgNames"
+            operator       = "Equals"
+            selector       = "really_not_suspicious"
+          }]
+        }
+      ]
+    },
+    #Managed Rule 2 - Microsoft_BotManagerRuleSet
+    {
+      action  = "Block"
+      type    = "Microsoft_BotManagerRuleSet"
+      version = "1.1"
+    }
+  ]
+
+  role_assignments = {
+    role_assignment_1 = {
+      #assign a built-in role to the virtual machine
+      role_definition_id_or_name = "Contributor"
+      principal_id               = data.azuread_client_config.current.object_id
+      description                = "Example for assigning a role to an existing principal for WAF scope"
+    }
+  }
+}
+
+```
+
+# Variables
+
+| Name                             | Type                           | Default Value | Description                                                                                                                                                                                                                                                                                            |
+|----------------------------------|--------------------------------|---------------|--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| `mode`                           | `string`                       | n/a           | The mode of the WAF Policy. Possible values are `'Detection'` and `'Prevention'`.                                                                                                                                                                                                                      |
+| `name`                           | `string`                       | n/a           | The name of this resource.                                                                                                                                                                                                                                                                             |
+| `resource_group_name`            | `string`                       | n/a           | The resource group where the resources will be deployed.                                                                                                                                                                                                                                               |
+| `sku_name`                       | `string`                       | n/a           | SKU name of the WAF Policy. Possible values are `'Standard_AzureFrontDoor'` and `'Premium_AzureFrontDoor'`.                                                                                                                                                                                            |
+| `custom_block_response_body`     | `string`                       | `null`        | Optional. The custom block response body. If the action type is block, you can override the response body by setting this variable. The body must be specified in base64 encoding.                                                                                                                      |
+| `custom_block_response_status_code` | `number`                    | `null`        | Optional. Override the response status code by setting this variable when a custom rule's action is block. Possible values are `200`, `403`, `405`, `406`, `429`.                                                                                                                                       |
+| `custom_rules`                   | `list(object)`                 | `[]`          | A list of custom rules to be applied to the WAF Policy. See [Custom Rules](#custom-rules) for detailed structure.                                                                                                                                                                                      |                                                                                                                                                        |
+| `enable_telemetry`               | `bool`                         | `true`        | Controls whether telemetry is enabled for the module. If set to `false`, no telemetry will be collected.                                                                                                                                                                                                |
+| `enabled`                        | `bool`                         | `true`        | Indicates whether the WAF Policy is enabled or disabled. Default is `true`.                                                                                                                                                                                                                            |
+| `managed_rules`                  | `list(object)`                 | See default value | A list of managed rule configurations for Azure WAF. See [Managed Rules](#managed-rules) for detailed structure.                                                                                                                                                                                       |
+| `redirect_url`                   | `string`                       | `null`        | Optional. The redirect URL for the WAF Policy.                                                                                                                                                                                                                                                         |
+| `request_body_check_enabled`     | `bool`                         | `true`        | Indicates whether to enable request body check. Default is `true`.                                                                                                                                                                                                                                     |
+| `role_assignments`               | `map(object)`                  | `{}`          | A map of role definitions and scopes to be assigned as part of this resource's implementation. See [Role Assignments](#role-assignments) for detailed structure.                                                                                                                                       |
+| `tags`                           | `map(string)`                  | `null`        | (Optional) Tags of the resource.                                                                                                                                                                                                                                                                       |
+| `lock`                           | `object`                       | `null`        | Controls the Resource Lock configuration for this resource. See [Lock](#lock) for detailed structure.                                                                                                                                                                                                  |
+
 <!-- markdownlint-disable MD033 -->
 ## Requirements
 
 The following requirements are needed by this module:
 
-- <a name="requirement_terraform"></a> [terraform](#requirement\_terraform) (~> 1.5)
+- <a name="requirement_terraform"></a> [terraform](#requirement\_terraform) (~> 1.9)
 
-- <a name="requirement_azurerm"></a> [azurerm](#requirement\_azurerm) (~> 3.71)
+- <a name="requirement_azurerm"></a> [azurerm](#requirement\_azurerm) (>= 3.116.0, < 5.0)
 
 - <a name="requirement_modtm"></a> [modtm](#requirement\_modtm) (~> 0.3)
 
@@ -36,12 +215,9 @@ The following requirements are needed by this module:
 
 The following resources are used by this module:
 
+- [azurerm_cdn_frontdoor_firewall_policy.waf_policy](https://registry.terraform.io/providers/hashicorp/azurerm/latest/docs/resources/cdn_frontdoor_firewall_policy) (resource)
 - [azurerm_management_lock.this](https://registry.terraform.io/providers/hashicorp/azurerm/latest/docs/resources/management_lock) (resource)
-- [azurerm_private_endpoint.this_managed_dns_zone_groups](https://registry.terraform.io/providers/hashicorp/azurerm/latest/docs/resources/private_endpoint) (resource)
-- [azurerm_private_endpoint.this_unmanaged_dns_zone_groups](https://registry.terraform.io/providers/hashicorp/azurerm/latest/docs/resources/private_endpoint) (resource)
-- [azurerm_private_endpoint_application_security_group_association.this](https://registry.terraform.io/providers/hashicorp/azurerm/latest/docs/resources/private_endpoint_application_security_group_association) (resource)
-- [azurerm_resource_group.TODO](https://registry.terraform.io/providers/hashicorp/azurerm/latest/docs/resources/resource_group) (resource)
-- [azurerm_role_assignment.this](https://registry.terraform.io/providers/hashicorp/azurerm/latest/docs/resources/role_assignment) (resource)
+- [azurerm_role_assignment.this_virtual_machine](https://registry.terraform.io/providers/hashicorp/azurerm/latest/docs/resources/role_assignment) (resource)
 - [modtm_telemetry.telemetry](https://registry.terraform.io/providers/azure/modtm/latest/docs/resources/telemetry) (resource)
 - [random_uuid.telemetry](https://registry.terraform.io/providers/hashicorp/random/latest/docs/resources/uuid) (resource)
 - [azurerm_client_config.telemetry](https://registry.terraform.io/providers/hashicorp/azurerm/latest/docs/data-sources/client_config) (data source)
@@ -52,9 +228,9 @@ The following resources are used by this module:
 
 The following input variables are required:
 
-### <a name="input_location"></a> [location](#input\_location)
+### <a name="input_mode"></a> [mode](#input\_mode)
 
-Description: Azure region where the resource should be deployed.
+Description: The mode of the WAF Policy. Possible values are 'Detection' and 'Prevention'.
 
 Type: `string`
 
@@ -70,73 +246,175 @@ Description: The resource group where the resources will be deployed.
 
 Type: `string`
 
+### <a name="input_sku_name"></a> [sku\_name](#input\_sku\_name)
+
+Description: SKU name of the WAF Policy. Possible values are 'Standard\_AzureFrontDoor' and 'Premium\_AzureFrontDoor'.
+
+Type: `string`
+
 ## Optional Inputs
 
 The following input variables are optional (have default values):
 
-### <a name="input_customer_managed_key"></a> [customer\_managed\_key](#input\_customer\_managed\_key)
+### <a name="input_custom_block_response_body"></a> [custom\_block\_response\_body](#input\_custom\_block\_response\_body)
 
-Description: A map describing customer-managed keys to associate with the resource. This includes the following properties:
-- `key_vault_resource_id` - The resource ID of the Key Vault where the key is stored.
-- `key_name` - The name of the key.
-- `key_version` - (Optional) The version of the key. If not specified, the latest version is used.
-- `user_assigned_identity` - (Optional) An object representing a user-assigned identity with the following properties:
-  - `resource_id` - The resource ID of the user-assigned identity.
+Description: Optional. The custom block response body. If the action type is block, customer can override the response body setting this varibale. The body must be specified in base64 encoding
 
-Type:
-
-```hcl
-object({
-    key_vault_resource_id = string
-    key_name              = string
-    key_version           = optional(string, null)
-    user_assigned_identity = optional(object({
-      resource_id = string
-    }), null)
-  })
-```
+Type: `string`
 
 Default: `null`
 
-### <a name="input_diagnostic_settings"></a> [diagnostic\_settings](#input\_diagnostic\_settings)
+### <a name="input_custom_block_response_status_code"></a> [custom\_block\_response\_status\_code](#input\_custom\_block\_response\_status\_code)
 
-Description: A map of diagnostic settings to create on the Key Vault. The map key is deliberately arbitrary to avoid issues where map keys maybe unknown at plan time.
+Description: Optional. Customer can override the response status code setting this varibale. If a custom rule block's action is block, this is the response status code. Possible values are 200, 403, 405, 406, 429
 
-- `name` - (Optional) The name of the diagnostic setting. One will be generated if not set, however this will not be unique if you want to create multiple diagnostic setting resources.
-- `log_categories` - (Optional) A set of log categories to send to the log analytics workspace. Defaults to `[]`.
-- `log_groups` - (Optional) A set of log groups to send to the log analytics workspace. Defaults to `["allLogs"]`.
-- `metric_categories` - (Optional) A set of metric categories to send to the log analytics workspace. Defaults to `["AllMetrics"]`.
-- `log_analytics_destination_type` - (Optional) The destination type for the diagnostic setting. Possible values are `Dedicated` and `AzureDiagnostics`. Defaults to `Dedicated`.
-- `workspace_resource_id` - (Optional) The resource ID of the log analytics workspace to send logs and metrics to.
-- `storage_account_resource_id` - (Optional) The resource ID of the storage account to send logs and metrics to.
-- `event_hub_authorization_rule_resource_id` - (Optional) The resource ID of the event hub authorization rule to send logs and metrics to.
-- `event_hub_name` - (Optional) The name of the event hub. If none is specified, the default event hub will be selected.
-- `marketplace_partner_resource_id` - (Optional) The full ARM resource ID of the Marketplace resource to which you would like to send Diagnostic LogsLogs.
+Type: `number`
+
+Default: `null`
+
+### <a name="input_custom_rules"></a> [custom\_rules](#input\_custom\_rules)
+
+Description: A list of custom rules to be applied to the WAF (Web Application Firewall) Policy.
+
+Each custom rule object in the list must include:
+
+- **name** (string, required): The name of the custom rule.
+
+- **priority** (number, required): The priority of the custom rule. Lower numbers indicate higher priority.
+
+- **type** (string, required): The type of the custom rule. Must be one of:
+  - "MatchRule"
+  - "RateLimitRule"
+
+- **action** (string, required): The action to take when the rule matches. Must be one of:
+  - "Allow"
+  - "Block"
+  - "Log"
+  - "Redirect"
+
+- **enabled** (bool, optional): Whether the rule is enabled. Defaults to `true`.
+
+- **rate\_limit\_duration\_in\_minutes** (number, optional): The duration of the rate limit in minutes. Required if `type` is "RateLimitRule". Defaults to `1`.
+
+- **rate\_limit\_threshold** (number, optional): The threshold of the rate limit. Required if `type` is "RateLimitRule". Defaults to `10`.
+
+- **match\_conditions** (list of objects, required): A list of match conditions for the rule.
+
+Each match condition object must include:
+
+- **match\_variable** (string, required): The variable to match against. Must be one of:
+  - "Cookies"
+  - "PostArgs"
+  - "QueryStrings"
+  - "RemoteAddr"
+  - "RequestBody"
+  - "RequestHeader"
+  - "RequestMethod"
+  - "RequestUri"
+  - "SocketAddr"
+
+- **operator** (string, required): The comparison type to use for matching with the variable value. Must be one of:
+  - "Any"
+  - "BeginsWith"
+  - "Contains"
+  - "EndsWith"
+  - "Equal"
+  - "GeoMatch"
+  - "GreaterThan"
+  - "GreaterThanOrEqual"
+  - "IPMatch"
+  - "LessThan"
+  - "LessThanOrEqual"
+  - "RegEx"
+
+- **match\_values** (list of strings, required): The values to match against. Up to **600** possible values across all `match_conditions` and `match_values` in all rules. Each string can be up to **256** characters in length.
+
+- **selector** (string, optional): Required if `match_variable` is one of "QueryStrings", "PostArgs", "RequestHeader", or "Cookies". Specifies the key to match against.
+
+- **negation\_condition** (bool, optional): Whether to negate the result of the condition. Defaults to `false`.
+
+- **transforms** (list of strings, optional): Up to **5** transforms to apply. Each must be one of:
+  - "Lowercase"
+  - "RemoveNulls"
+  - "Trim"
+  - "Uppercase"
+  - "URLDecode"
+  - "URLEncode"
+
+*Example 1: Basic Configuration with Default Rule Set*
+```hcl
+custom_rules = [
+    #custom rule 1
+    {
+      name     = "RateLimitRule1"
+      priority = 100
+      type     = "RateLimitRule"
+      action   = "Block"
+      match_conditions = [{
+        match_variable = "QueryString"
+        operator       = "Contains"
+        match_values   = ["promo"]
+        }
+      ]
+    },
+    #custom rule 2
+    {
+      name     = "GeographicRule1"
+      priority = 101
+      type     = "MatchRule"
+      action   = "Block"
+      match_conditions = [{
+        match_variable = "RemoteAddr"
+        operator       = "GeoMatch"
+        match_values   = ["MX", "AR"]
+        },
+        {
+          match_variable = "RemoteAddr"
+          operator       = "IPMatch"
+          match_values   = ["10.10.10.0/24"]
+        }
+      ]
+    }
+]
+```
 
 Type:
 
 ```hcl
-map(object({
-    name                                     = optional(string, null)
-    log_categories                           = optional(set(string), [])
-    log_groups                               = optional(set(string), ["allLogs"])
-    metric_categories                        = optional(set(string), ["AllMetrics"])
-    log_analytics_destination_type           = optional(string, "Dedicated")
-    workspace_resource_id                    = optional(string, null)
-    storage_account_resource_id              = optional(string, null)
-    event_hub_authorization_rule_resource_id = optional(string, null)
-    event_hub_name                           = optional(string, null)
-    marketplace_partner_resource_id          = optional(string, null)
+list(object({
+    name                           = string               # Required
+    priority                       = number               # Required
+    type                           = string               # Must be "MatchRule" or "RateLimitRule"
+    action                         = string               # Must be "Allow", "Block", "Log", "Redirect"
+    enabled                        = optional(bool, true) # Default is true
+    rate_limit_duration_in_minutes = optional(number, 1)  # Default is 1
+    rate_limit_threshold           = optional(number, 10) # Default is 10
+    match_conditions = list(object({
+      match_variable     = string                     #Required, must be one of these values  "Cookies", "PostArgs", "QueryStrings", "RemoteAddr", "RequestBody" "RequestHeader", "RequestMethod", "RequestUri", "SocketAddr"
+      operator           = string                     #(Required) Comparison type to use for matching with the variable value. Possible values are Any, BeginsWith, Contains, EndsWith, Equal, GeoMatch, GreaterThan, GreaterThanOrEqual, IPMatch, LessThan, LessThanOrEqual or RegEx
+      match_values       = list(string)               # Required Up to 600 possible values to match. Limit is in total across all match_condition blocks and match_values arguments. String value itself can be up to 256 characters in length
+      selector           = optional(string, null)     # (Optional) Match against a specific key if the match_variable is QueryString, PostArgs, RequestHeader or Cookies.
+      negation_condition = optional(bool, null)       #(Optional) Should the result of the condition be negated.
+      transforms         = optional(list(string), []) #(Optional) Up to 5 transforms to apply. Possible values are Lowercase, RemoveNulls, Trim, Uppercase, URLDecode or URLEncode.
+    }))
   }))
 ```
 
-Default: `{}`
+Default: `[]`
 
 ### <a name="input_enable_telemetry"></a> [enable\_telemetry](#input\_enable\_telemetry)
 
 Description: This variable controls whether or not telemetry is enabled for the module.  
 For more information see <https://aka.ms/avm/telemetryinfo>.  
 If it is set to false, then no telemetry will be collected.
+
+Type: `bool`
+
+Default: `true`
+
+### <a name="input_enabled"></a> [enabled](#input\_enabled)
+
+Description: Indicates whether the WAF Policy is enabled or disabled. Default is true.
 
 Type: `bool`
 
@@ -160,83 +438,218 @@ object({
 
 Default: `null`
 
-### <a name="input_managed_identities"></a> [managed\_identities](#input\_managed\_identities)
+### <a name="input_managed_rules"></a> [managed\_rules](#input\_managed\_rules)
 
-Description: Controls the Managed Identity configuration on this resource. The following properties can be specified:
+Description: The `managed_rules` variable is a list of managed rule configurations for Azure Web Application Firewall (WAF). It allows you to specify which managed rule sets to apply, customize their actions, and define any exclusions or overrides needed for your application.
 
-- `system_assigned` - (Optional) Specifies if the System Assigned Managed Identity should be enabled.
-- `user_assigned_resource_ids` - (Optional) Specifies a list of User Assigned Managed Identity resource IDs to be assigned to this resource.
+**Variable Type**: `list(object({ ... }))`
 
-Type:
+---
+
+### Structure of each Managed Rule:
+
+- **type** *(string, Required)*:  
+  Specifies the type of the managed rule set to use. Possible values are:
+  - `"DefaultRuleSet"`
+  - `"Microsoft_DefaultRuleSet"`
+  - `"BotProtection"`
+  - `"Microsoft_BotManagerRuleSet"`
+
+- **action** *(string, Required)*:  
+  The action to perform when the managed rule is matched or when the anomaly score exceeds a certain threshold, depending on the DRS version. Possible values include:
+  - `"Allow"`
+  - `"Log"`
+  - `"Block"`
+  - `"Redirect"`
+
+- **version** *(string, Required)*:  
+  The version of the managed rule set to apply. Available versions depend on the `type` selected:
+  - For `"DefaultRuleSet"`: `"1.0"`, `"preview-0.1"`
+  - For `"Microsoft_DefaultRuleSet"`: `"1.1"`, `"2.0"`, `"2.1"`
+  - For `"BotProtection"`: `"preview-0.1"`
+  - For `"Microsoft_BotManagerRuleSet"`: `"1.0"`
+
+- **exclusions** *(optional, list(object({ ... })))*:  
+  A list of exclusion blocks to specify variables that should be excluded from the managed rule processing.
+
+  - **match\_variable** *(string, Required)*:  
+    The type of variable to exclude. Possible values:
+    - `"QueryStringArgNames"`
+    - `"RequestBodyPostArgNames"`
+    - `"RequestCookieNames"`
+    - `"RequestHeaderNames"`
+    - `"RequestBodyJsonArgNames"` *(Available only on DRS 2.0 or later)*
+
+  - **selector** *(string, Required)*:  
+    The specific value within the `match_variable` to exclude. If `operator` is `"EqualsAny"`, `selector` must be set to `"*"`.
+
+  - **operator** *(string, Required)*:  
+    The comparison operator for the `selector`. Possible values:
+    - `"Equals"`
+    - `"Contains"`
+    - `"StartsWith"`
+    - `"EndsWith"`
+    - `"EqualsAny"`
+
+- **overrides** *(optional, list(object({ ... })))*:  
+  A list of override blocks to customize specific rule groups or rules within the managed rule set.
+
+  - **rule\_group\_name** *(string, Required)*:  
+    The name of the rule group to override.
+
+  - **rules** *(optional, list(object({ ... })))*:  
+    A list of rule blocks to override individual rules.
+
+    - **rule\_id** *(string, Required)*:  
+      The identifier of the managed rule to override.
+
+    - **enabled** *(bool, Optional, default = false)*:  
+      Indicates whether the managed rule override is enabled.
+
+    - **action** *(string, Required)*:  
+      The action to apply when the rule matches. Possible values depend on the DRS version:
+      - For DRS 1.1 and below: `"Allow"`, `"Log"`, `"Block"`, `"Redirect"`
+      - For DRS 2.0 and above: `"Log"`, `"AnomalyScoring"`
+
+    - **exclusions** *(optional, list(object({ ... })))*:  
+      Exclusions specific to this rule, with the same structure as above.
+
+  - **exclusions** *(optional, list(object({ ... })))*:  
+    Exclusions at the rule group level.
+
+---
+
+### Default Value:
 
 ```hcl
-object({
-    system_assigned            = optional(bool, false)
-    user_assigned_resource_ids = optional(set(string), [])
-  })
+[
+  # Managed Rule 1 - Microsoft_DefaultRuleSet 2.1
+  {
+    action  = "Block"
+    type    = "Microsoft_DefaultRuleSet"
+    version = "2.1"
+  },
+  # Managed Rule 2 - Microsoft_BotManagerRuleSet 1.1
+  {
+    action  = "Block"
+    type    = "Microsoft_BotManagerRuleSet"
+    version = "1.1"
+  }
+]
+```
+*Example 1: Basic Configuration with Default Rule Set*
+```hcl
+managed_rules = [
+  {
+    type    = "Microsoft_DefaultRuleSet"
+    action  = "Block"
+    version = "2.1"
+  }
+]
+```  
+This configuration applies the Microsoft Default Rule Set version 2.1 with a block action for matched rules.
+
+*Example 2: Adding Exclusions*
+```hcl
+managed_rules = [
+  {
+    type       = "Microsoft_DefaultRuleSet"
+    action     = "Block"
+    version    = "2.1"
+    exclusions = [
+      {
+        match_variable = "RequestHeaderNames"
+        selector       = "User-Agent"
+        operator       = "Equals"
+      },
+      {
+        match_variable = "QueryStringArgNames"
+        selector       = "session_id"
+        operator       = "Contains"
+      }
+    ]
+
+    overrides = [{
+        rule_group_name = "PHP"
+        rules = [{
+          rule_id = "933100"
+          enabled = false
+          action  = "AnomalyScoring"
+          },
+          {
+            rule_id = "933110"
+            enabled = true
+            action  = "AnomalyScoring"
+        }]
+      }]
+  }
+]
 ```
 
-Default: `{}`
-
-### <a name="input_private_endpoints"></a> [private\_endpoints](#input\_private\_endpoints)
-
-Description: A map of private endpoints to create on this resource. The map key is deliberately arbitrary to avoid issues where map keys maybe unknown at plan time.
-
-- `name` - (Optional) The name of the private endpoint. One will be generated if not set.
-- `role_assignments` - (Optional) A map of role assignments to create on the private endpoint. The map key is deliberately arbitrary to avoid issues where map keys maybe unknown at plan time. See `var.role_assignments` for more information.
-- `lock` - (Optional) The lock level to apply to the private endpoint. Default is `None`. Possible values are `None`, `CanNotDelete`, and `ReadOnly`.
-- `tags` - (Optional) A mapping of tags to assign to the private endpoint.
-- `subnet_resource_id` - The resource ID of the subnet to deploy the private endpoint in.
-- `private_dns_zone_group_name` - (Optional) The name of the private DNS zone group. One will be generated if not set.
-- `private_dns_zone_resource_ids` - (Optional) A set of resource IDs of private DNS zones to associate with the private endpoint. If not set, no zone groups will be created and the private endpoint will not be associated with any private DNS zones. DNS records must be managed external to this module.
-- `application_security_group_resource_ids` - (Optional) A map of resource IDs of application security groups to associate with the private endpoint. The map key is deliberately arbitrary to avoid issues where map keys maybe unknown at plan time.
-- `private_service_connection_name` - (Optional) The name of the private service connection. One will be generated if not set.
-- `network_interface_name` - (Optional) The name of the network interface. One will be generated if not set.
-- `location` - (Optional) The Azure location where the resources will be deployed. Defaults to the location of the resource group.
-- `resource_group_name` - (Optional) The resource group where the resources will be deployed. Defaults to the resource group of this resource.
-- `ip_configurations` - (Optional) A map of IP configurations to create on the private endpoint. If not specified the platform will create one. The map key is deliberately arbitrary to avoid issues where map keys maybe unknown at plan time.
-  - `name` - The name of the IP configuration.
-  - `private_ip_address` - The private IP address of the IP configuration.
-
 Type:
 
 ```hcl
-map(object({
-    name = optional(string, null)
-    role_assignments = optional(map(object({
-      role_definition_id_or_name             = string
-      principal_id                           = string
-      description                            = optional(string, null)
-      skip_service_principal_aad_check       = optional(bool, false)
-      condition                              = optional(string, null)
-      condition_version                      = optional(string, null)
-      delegated_managed_identity_resource_id = optional(string, null)
-    })), {})
-    lock = optional(object({
-      kind = string
-      name = optional(string, null)
-    }), null)
-    tags                                    = optional(map(string), null)
-    subnet_resource_id                      = string
-    private_dns_zone_group_name             = optional(string, "default")
-    private_dns_zone_resource_ids           = optional(set(string), [])
-    application_security_group_associations = optional(map(string), {})
-    private_service_connection_name         = optional(string, null)
-    network_interface_name                  = optional(string, null)
-    location                                = optional(string, null)
-    resource_group_name                     = optional(string, null)
-    ip_configurations = optional(map(object({
-      name               = string
-      private_ip_address = string
-    })), {})
+list(object({
+    type    = string                    # (Required) The type of the managed rule. Possible values are "DefaultRuleSet" and "Microsoft_DefaultRuleSet", "BotProtection", "Microsoft_BotManagerRuleSet"
+    action  = string                    # (Required) The action to perform for all DRS rules when the managed rule is matched or when the anomaly score is 5 or greater depending on which version of the DRS you are using. Possible values include Allow, Log, Block, and Redirect
+    version = string                    # (Required) The version of the managed rule set to use. Possible values depends on which DRS type you are using, for the DefaultRuleSet type the possible values include 1.0 or preview-0.1. For Microsoft_DefaultRuleSet the possible values include 1.1, 2.0 or 2.1. For BotProtection the value must be preview-0.1 and for Microsoft_BotManagerRuleSet the value must be 1.0.
+    exclusions = optional(list(object({ # (Optional) A list of Exclusion blocks.
+      match_variable = string           # (Required) (Required) The variable type to be excluded. Possible values are QueryStringArgNames, RequestBodyPostArgNames, RequestCookieNames, RequestHeaderNames, RequestBodyJsonArgNames. Important: RequestBodyJsonArgNames is only available on Default Rule Set (DRS) 2.0 or later
+      selector       = string           # (Required) Selector for the value in the match_variable attribute this exclusion applies to. selector must be set to * if operator is set to EqualsAny.
+      operator       = string           # (Required) Comparison operator to apply to the selector when specifying which elements in the collection this exclusion applies to. Possible values are: Equals, Contains, StartsWith, EndsWith, EqualsAny
+    })))
+
+    overrides = optional(list(object({      # (Optional) A list of Override blocks.
+      rule_group_name = string              # (Required) The name of the rule group to override.
+      rules = optional(list(object({        # (Optional) A list of Rule blocks.
+        rule_id = string                    # (Required) Identifier for the managed rule.
+        enabled = optional(bool, false)     # (Optional) Is the managed rule override enabled or disabled. Defaults to false
+        action  = string                    # (Required) The action to be applied when the managed rule matches or when the anomaly score is 5 or greater. Possible values for DRS 1.1 and below are Allow, Log, Block, and Redirect. For DRS 2.0 and above the possible values are Log or AnomalyScoring.
+        exclusions = optional(list(object({ # (Optional) A list of Exclusion blocks.
+          match_variable = string           # (Required) (Required) The variable type to be excluded. Possible values are QueryStringArgNames, RequestBodyPostArgNames, RequestCookieNames, RequestHeaderNames, RequestBodyJsonArgNames. Important: RequestBodyJsonArgNames is only available on Default Rule Set (DRS) 2.0 or later
+          selector       = string           # (Required) Selector for the value in the match_variable attribute this exclusion applies to. selector must be set to * if operator is set to EqualsAny.
+          operator       = string           # (Required) Comparison operator to apply to the selector when specifying which elements in the collection this exclusion applies to. Possible values are: Equals, Contains, StartsWith, EndsWith, EqualsAny
+        })))
+      })))
+
+      exclusions = optional(list(object({ # (Optional) A list of Exclusion blocks.
+        match_variable = string           # (Required) (Required) The variable type to be excluded. Possible values are QueryStringArgNames, RequestBodyPostArgNames, RequestCookieNames, RequestHeaderNames, RequestBodyJsonArgNames. Important: RequestBodyJsonArgNames is only available on Default Rule Set (DRS) 2.0 or later
+        selector       = string           # (Required) Selector for the value in the match_variable attribute this exclusion applies to. selector must be set to * if operator is set to EqualsAny.
+        operator       = string           # (Required) Comparison operator to apply to the selector when specifying which elements in the collection this exclusion applies to. Possible values are: Equals, Contains, StartsWith, EndsWith, EqualsAny
+      })))
+
+    })))
   }))
 ```
 
-Default: `{}`
+Default:
 
-### <a name="input_private_endpoints_manage_dns_zone_group"></a> [private\_endpoints\_manage\_dns\_zone\_group](#input\_private\_endpoints\_manage\_dns\_zone\_group)
+```json
+[
+  {
+    "action": "Block",
+    "type": "Microsoft_DefaultRuleSet",
+    "version": "2.1"
+  },
+  {
+    "action": "Block",
+    "type": "Microsoft_BotManagerRuleSet",
+    "version": "1.1"
+  }
+]
+```
 
-Description: Whether to manage private DNS zone groups with this module. If set to false, you must manage private DNS zone groups externally, e.g. using Azure Policy.
+### <a name="input_redirect_url"></a> [redirect\_url](#input\_redirect\_url)
+
+Description: Optional. The redirect URL for the WAF Policy.
+
+Type: `string`
+
+Default: `null`
+
+### <a name="input_request_body_check_enabled"></a> [request\_body\_check\_enabled](#input\_request\_body\_check\_enabled)
+
+Description: Indicates whether to enable request body check. Default is true.
 
 Type: `bool`
 
@@ -244,16 +657,31 @@ Default: `true`
 
 ### <a name="input_role_assignments"></a> [role\_assignments](#input\_role\_assignments)
 
-Description: A map of role assignments to create on this resource. The map key is deliberately arbitrary to avoid issues where map keys maybe unknown at plan time.
+Description: A map of role definitions and scopes to be assigned as part of this resources implementation.  Two forms are supported. Assignments against this virtual machine resource scope and assignments to external resource scopes using the system managed identity.
 
-- `role_definition_id_or_name` - The ID or name of the role definition to assign to the principal.
-- `principal_id` - The ID of the principal to assign the role to.
-- `description` - The description of the role assignment.
-- `skip_service_principal_aad_check` - If set to true, skips the Azure Active Directory check for the service principal in the tenant. Defaults to false.
-- `condition` - The condition which will be used to scope the role assignment.
-- `condition_version` - The version of the condition syntax. Valid values are '2.0'.
+- `<map key>` - Use a custom map key to define each role assignment configuration for this virtual machine
+  - `principal_id`                               = (optional) - The ID of the Principal (User, Group or Service Principal) to assign the Role Definition to. Changing this forces a new resource to be created.
+  - `role_definition_id_or_name`                 = (Optional) - The Scoped-ID of the Role Definition or the built-in role name. Changing this forces a new resource to be created. Conflicts with role\_definition\_name
+  - `condition`                                  = (Optional) - The condition that limits the resources that the role can be assigned to. Changing this forces a new resource to be created.
+  - `condition_version`                          = (Optional) - The version of the condition. Possible values are 1.0 or 2.0. Changing this forces a new resource to be created.
+  - `description`                                = (Optional) - The description for this Role Assignment. Changing this forces a new resource to be created.
+  - `skip_service_principal_aad_check`           = (Optional) - If the principal\_id is a newly provisioned Service Principal set this value to true to skip the Azure Active Directory check which may fail due to replication lag. This argument is only valid if the principal\_id is a Service Principal identity. Defaults to false.
+  - `delegated_managed_identity_resource_id`     = (Optional) - The delegated Azure Resource Id which contains a Managed Identity. Changing this forces a new resource to be created.  
+  - `principal_type`                             = (Optional) - The type of the `principal_id`. Possible values are `User`, `Group` and `ServicePrincipal`. It is necessary to explicitly set this attribute when creating role assignments if the principal creating the assignment is constrained by ABAC rules that filters on the PrincipalType attribute.
 
-> Note: only set `skip_service_principal_aad_check` to true if you are assigning a role to a service principal.
+Example Inputs:
+
+```hcl
+#typical assignment example. It is also common for the scope resource ID to be a terraform resource reference like azurerm_resource_group.example.id
+role_assignments = {
+  role_assignment_1 = {
+    #assign a built-in role to the virtual machine
+    role_definition_id_or_name                 = "Storage Blob Data Contributor"
+    principal_id                               = data.azuread_client_config.current.object_id
+    description                                = "Example for assigning a role to an existing principal for the virtual machine scope"        
+  }
+}
+```
 
 Type:
 
@@ -261,12 +689,15 @@ Type:
 map(object({
     role_definition_id_or_name             = string
     principal_id                           = string
-    description                            = optional(string, null)
-    skip_service_principal_aad_check       = optional(bool, false)
     condition                              = optional(string, null)
     condition_version                      = optional(string, null)
     delegated_managed_identity_resource_id = optional(string, null)
-  }))
+    description                            = optional(string, null)
+    principal_type                         = optional(string, null)
+    skip_service_principal_aad_check       = optional(bool, false)
+
+    }
+  ))
 ```
 
 Default: `{}`
@@ -283,9 +714,13 @@ Default: `null`
 
 The following outputs are exported:
 
-### <a name="output_private_endpoints"></a> [private\_endpoints](#output\_private\_endpoints)
+### <a name="output_resource"></a> [resource](#output\_resource)
 
-Description:   A map of the private endpoints created.
+Description: This is the full output for the resource.
+
+### <a name="output_resource_id"></a> [resource\_id](#output\_resource\_id)
+
+Description: The ID of the WAF Policy.
 
 ## Modules
 
