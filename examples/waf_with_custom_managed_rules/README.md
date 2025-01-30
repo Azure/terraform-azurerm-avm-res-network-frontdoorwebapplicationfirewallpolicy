@@ -5,7 +5,7 @@ This deploys the module showing how to specify managed rules and how to create c
 
 ```hcl
 terraform {
-  required_version = "~> 1.9"
+  required_version = ">= 1.9, < 2.0"
   required_providers {
     azuread = {
       source  = "hashicorp/azuread"
@@ -209,7 +209,7 @@ module "test" {
 
 The following requirements are needed by this module:
 
-- <a name="requirement_terraform"></a> [terraform](#requirement\_terraform) (~> 1.9)
+- <a name="requirement_terraform"></a> [terraform](#requirement\_terraform) (>= 1.9, < 2.0)
 
 - <a name="requirement_azuread"></a> [azuread](#requirement\_azuread) (3.0.2)
 
