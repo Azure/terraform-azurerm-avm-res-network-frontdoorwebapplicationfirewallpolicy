@@ -67,20 +67,13 @@ resource "random_string" "suffix" {
 
 module "test" {
   source = "../.."
-  # source  = "Azure/avm-res-network-frontdoorapplicationfirewallpolicy/azurerm"
-  # version = "0.1.0"
 
-  name                = "mywafpolicy${random_string.suffix.result}"
-  resource_group_name = azurerm_resource_group.this.name
-  enable_telemetry    = local.enable_telemetry
-  mode                = "Prevention"
-  sku_name            = "Premium_AzureFrontDoor"
-
-  request_body_check_enabled        = true
-  redirect_url                      = "https://learn.microsoft.com/docs/"
-  custom_block_response_status_code = 405
+  mode                              = "Prevention"
+  name                              = "mywafpolicy${random_string.suffix.result}"
+  resource_group_name               = azurerm_resource_group.this.name
+  sku_name                          = "Premium_AzureFrontDoor"
   custom_block_response_body        = base64encode("Blocked by WAF")
-
+  custom_block_response_status_code = 405
   custom_rules = [
     #custom rule 1
     {
@@ -127,7 +120,7 @@ module "test" {
       }]
     }
   ]
-
+  enable_telemetry = local.enable_telemetry
   managed_rules = [
     #Managed Rule 1 - Microsoft_DefaultRuleSet
     {
@@ -191,7 +184,8 @@ module "test" {
       version = "1.1"
     }
   ]
-
+  redirect_url               = "https://learn.microsoft.com/docs/"
+  request_body_check_enabled = true
   role_assignments = {
     role_assignment_1 = {
       #assign a built-in role to the virtual machine
@@ -200,7 +194,6 @@ module "test" {
       description                = "Example for assigning a role to an existing principal for WAF scope"
     }
   }
-
 }
 ```
 
