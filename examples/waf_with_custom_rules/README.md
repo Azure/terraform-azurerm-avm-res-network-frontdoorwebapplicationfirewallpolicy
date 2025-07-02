@@ -6,6 +6,7 @@ This deploys the module showing how to create custom rules
 ```hcl
 terraform {
   required_version = ">= 1.9, < 2.0"
+
   required_providers {
     azurerm = {
       source  = "hashicorp/azurerm"
@@ -62,20 +63,13 @@ resource "random_string" "suffix" {
 
 module "test" {
   source = "../.."
-  # source  = "Azure/avm-res-network-frontdoorapplicationfirewallpolicy/azurerm"
-  # version = "0.1.0"
 
-  name                = "mywafpolicy${random_string.suffix.result}"
-  resource_group_name = azurerm_resource_group.this.name
-  enable_telemetry    = local.enable_telemetry
-  mode                = "Prevention"
-  sku_name            = "Premium_AzureFrontDoor"
-
-  request_body_check_enabled        = true
-  redirect_url                      = "https://learn.microsoft.com/docs/"
-  custom_block_response_status_code = 405
+  mode                              = "Prevention"
+  name                              = "mywafpolicy${random_string.suffix.result}"
+  resource_group_name               = azurerm_resource_group.this.name
+  sku_name                          = "Premium_AzureFrontDoor"
   custom_block_response_body        = base64encode("Blocked by Azure WAF")
-
+  custom_block_response_status_code = 405
   custom_rules = [
     #custom rule 1
     {
@@ -122,6 +116,9 @@ module "test" {
       }]
     }
   ]
+  enable_telemetry           = local.enable_telemetry
+  redirect_url               = "https://learn.microsoft.com/docs/"
+  request_body_check_enabled = true
 }
 ```
 
