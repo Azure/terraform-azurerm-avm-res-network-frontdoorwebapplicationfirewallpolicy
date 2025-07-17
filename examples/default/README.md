@@ -6,6 +6,7 @@ This deploys the module in its simplest form. The configuration ensures that res
 ```hcl
 terraform {
   required_version = ">= 1.9, < 2.0"
+
   required_providers {
     azurerm = {
       source  = "hashicorp/azurerm"
@@ -64,15 +65,12 @@ resource "random_string" "suffix" {
 # Create a WAF policy in its simplest form
 module "test" {
   source = "../.."
-  # source  = "Azure/avm-res-network-frontdoorapplicationfirewallpolicy/azurerm"
-  # version = "0.1.0"
 
+  mode                = "Prevention"
   name                = "mywafpolicy${random_string.suffix.result}"
   resource_group_name = azurerm_resource_group.this.name
+  sku_name            = "Premium_AzureFrontDoor"
   enable_telemetry    = local.enable_telemetry
-
-  mode     = "Prevention"
-  sku_name = "Premium_AzureFrontDoor"
 }
 ```
 
