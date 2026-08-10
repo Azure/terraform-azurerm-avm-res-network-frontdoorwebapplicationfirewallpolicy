@@ -37,6 +37,7 @@ resource "azurerm_cdn_frontdoor_firewall_policy" "waf_policy" {
       }
     }
   }
+
   dynamic "managed_rule" {
     for_each = var.managed_rules
 
@@ -94,8 +95,6 @@ resource "azurerm_cdn_frontdoor_firewall_policy" "waf_policy" {
   }
 }
 
-
-
 # required AVM resources interfaces
 resource "azurerm_management_lock" "this" {
   count = var.lock != null ? 1 : 0
@@ -105,4 +104,3 @@ resource "azurerm_management_lock" "this" {
   scope      = azurerm_cdn_frontdoor_firewall_policy.waf_policy.id
   notes      = var.lock.kind == "CanNotDelete" ? "Cannot delete the resource or its child resources." : "Cannot delete or modify the resource or its child resources."
 }
-
