@@ -29,7 +29,6 @@ provider "azurerm" {
   skip_provider_registration = true
 }
 
-
 locals {
   enable_telemetry = true
   location         = "eastus2"
@@ -41,7 +40,6 @@ locals {
     delete       = "yes"
   }
 }
-
 
 # This ensures we have unique CAF compliant names for our resources.
 module "naming" {
@@ -55,13 +53,13 @@ resource "azurerm_resource_group" "this" {
   name     = module.naming.resource_group.name_unique
   tags     = local.tags
 }
+
 # Create a random string for the suffix
 resource "random_string" "suffix" {
   length  = 5
   special = false
   upper   = false
 }
-
 
 # Create a WAF policy in its simplest form
 module "test" {

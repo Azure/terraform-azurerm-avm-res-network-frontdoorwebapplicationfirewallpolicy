@@ -33,7 +33,6 @@ provider "azurerm" {
   skip_provider_registration = true
 }
 
-
 locals {
   enable_telemetry = true #enable_telemetry is a variable that controls whether or not telemetry is enabled for the module.
   location         = "eastus2"
@@ -60,6 +59,7 @@ resource "azurerm_resource_group" "this" {
   name     = module.naming.resource_group.name_unique
   tags     = local.tags
 }
+
 # Create a random string for the suffix
 resource "random_string" "suffix" {
   length  = 5
