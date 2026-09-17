@@ -69,7 +69,7 @@ module "test" {
   name                = "mywafpolicy${random_string.suffix.result}"
   resource_group_name = azurerm_resource_group.this.name
   sku_name            = "Premium_AzureFrontDoor"
-  enable_telemetry    = local.enable_telemetry
+  enable_telemetry    = false
 }
 ```
 
