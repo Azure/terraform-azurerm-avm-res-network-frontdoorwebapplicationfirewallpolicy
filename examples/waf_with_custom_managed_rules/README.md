@@ -122,7 +122,7 @@ module "test" {
       }]
     }
   ]
-  enable_telemetry = local.enable_telemetry
+  enable_telemetry = false
   managed_rules = [
     #Managed Rule 1 - Microsoft_DefaultRuleSet
     {
