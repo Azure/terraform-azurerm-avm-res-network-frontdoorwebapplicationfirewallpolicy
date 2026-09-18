@@ -115,7 +115,7 @@ module "test" {
       }]
     }
   ]
-  enable_telemetry = false
+  enable_telemetry = var.enable_telemetry
   managed_rules = [
     #Managed Rule 1 - Microsoft_DefaultRuleSet
     {

@@ -109,7 +109,7 @@ module "test" {
       }]
     }
   ]
-  enable_telemetry           = false
+  enable_telemetry           = var.enable_telemetry
   redirect_url               = "https://learn.microsoft.com/docs/"
   request_body_check_enabled = true
 }
