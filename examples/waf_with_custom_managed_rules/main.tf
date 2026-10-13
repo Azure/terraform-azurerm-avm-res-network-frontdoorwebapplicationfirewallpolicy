@@ -8,7 +8,7 @@ terraform {
     }
     azurerm = {
       source  = "hashicorp/azurerm"
-      version = "~> 3.116.0"
+      version = "~> 4.0"
     }
     random = {
       source  = "hashicorp/random"
@@ -23,12 +23,11 @@ provider "azurerm" {
       prevent_deletion_if_contains_resources = false
     }
   }
-  skip_provider_registration = true
+  resource_provider_registrations = "none"
 }
 
 locals {
-  enable_telemetry = true #enable_telemetry is a variable that controls whether or not telemetry is enabled for the module.
-  location         = "eastus2"
+  location = "eastus2"
   tags = {
     scenario     = "WAF with custom and managed rules"
     project      = "Web Application Firewall for Azure Front Door"
@@ -43,7 +42,7 @@ data "azuread_client_config" "current" {}
 # This ensures we have unique CAF compliant names for our resources.
 module "naming" {
   source  = "Azure/naming/azurerm"
-  version = "~> 0.3"
+  version = "0.4.4"
 }
 
 # This is required for resource modules
