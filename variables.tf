@@ -1,3 +1,9 @@
+variable "location" {
+  type        = string
+  description = "The Azure region for this module's resources or telemetry deployment."
+  nullable    = false
+}
+
 variable "mode" {
   type        = string
   description = "The mode of the WAF Policy. Possible values are 'Detection' and 'Prevention'."
