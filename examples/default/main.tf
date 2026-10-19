@@ -35,8 +35,8 @@ locals {
 
 # This ensures we have unique CAF compliant names for our resources.
 module "naming" {
-  source  = "Azure/naming/azurerm"
-  version = "0.4.4"
+  source  = "Azure/avm-utl-naming/azure"
+  version = "0.2.0"
 }
 
 # This is required for resource modules
@@ -57,6 +57,7 @@ resource "random_string" "suffix" {
 module "test" {
   source = "../.."
 
+  location            = var.location
   mode                = "Prevention"
   name                = "mywafpolicy${random_string.suffix.result}"
   resource_group_name = azurerm_resource_group.this.name
