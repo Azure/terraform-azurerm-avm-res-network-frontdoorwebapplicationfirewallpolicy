@@ -9,6 +9,11 @@ terraform {
   required_version = ">= 1.9, < 2.0"
 
   required_providers {
+    # tflint-ignore: terraform_unused_required_providers
+    azapi = {
+      source  = "Azure/azapi"
+      version = "~> 2.12"
+    }
     azuread = {
       source  = "hashicorp/azuread"
       version = "3.0.2"
@@ -48,8 +53,8 @@ data "azuread_client_config" "current" {}
 
 # This ensures we have unique CAF compliant names for our resources.
 module "naming" {
-  source  = "Azure/naming/azurerm"
-  version = "0.4.4"
+  source  = "Azure/avm-utl-naming/azure"
+  version = "0.2.0"
 }
 
 # This is required for resource modules
@@ -69,6 +74,7 @@ resource "random_string" "suffix" {
 module "test" {
   source = "../.."
 
+  location                          = var.location
   mode                              = "Prevention"
   name                              = "mywafpolicy${random_string.suffix.result}"
   resource_group_name               = azurerm_resource_group.this.name
@@ -205,6 +211,8 @@ The following requirements are needed by this module:
 
 - <a name="requirement_terraform"></a> [terraform](#requirement\_terraform) (>= 1.9, < 2.0)
 
+- <a name="requirement_azapi"></a> [azapi](#requirement\_azapi) (~> 2.12)
+
 - <a name="requirement_azuread"></a> [azuread](#requirement\_azuread) (3.0.2)
 
 - <a name="requirement_azurerm"></a> [azurerm](#requirement\_azurerm) (~> 4.0)
@@ -238,6 +246,14 @@ Type: `bool`
 
 Default: `true`
 
+### <a name="input_location"></a> [location](#input\_location)
+
+Description: The Azure region for this module's resources or telemetry deployment.
+
+Type: `string`
+
+Default: `"eastus"`
+
 ## Outputs
 
 No outputs.
@@ -248,9 +264,9 @@ The following Modules are called:
 
 ### <a name="module_naming"></a> [naming](#module\_naming)
 
-Source: Azure/naming/azurerm
+Source: Azure/avm-utl-naming/azure
 
-Version: 0.4.4
+Version: 0.2.0
 
 ### <a name="module_test"></a> [test](#module\_test)
 
