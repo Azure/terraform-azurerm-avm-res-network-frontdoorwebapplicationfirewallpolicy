@@ -9,7 +9,7 @@ terraform {
     }
     azuread = {
       source  = "hashicorp/azuread"
-      version = "3.0.2"
+      version = "3.10.0"
     }
     azurerm = {
       source  = "hashicorp/azurerm"
@@ -47,7 +47,7 @@ data "azuread_client_config" "current" {}
 # This ensures we have unique CAF compliant names for our resources.
 module "naming" {
   source  = "Azure/avm-utl-naming/azure"
-  version = "0.2.0"
+  version = "0.3.0"
 }
 
 # This is required for resource modules
