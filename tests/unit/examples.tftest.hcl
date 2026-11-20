@@ -31,7 +31,7 @@ run "default_example" {
   command = apply
 
   module {
-    source = "./examples/default"
+    source = "./examples/defaults"
   }
 
   assert {
@@ -67,7 +67,7 @@ run "custom_and_managed_rules_example" {
   command = apply
 
   module {
-    source = "./examples/waf_with_custom_managed_rules"
+    source = "./examples/waf-aligned"
   }
 
   assert {
