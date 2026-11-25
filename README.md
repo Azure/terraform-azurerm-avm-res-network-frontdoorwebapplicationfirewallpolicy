@@ -226,12 +226,6 @@ The following resources are used by this module:
 
 The following input variables are required:
 
-### <a name="input_location"></a> [location](#input\_location)
-
-Description: The Azure region for this module's resources or telemetry deployment.
-
-Type: `string`
-
 ### <a name="input_mode"></a> [mode](#input\_mode)
 
 Description: The mode of the WAF Policy. Possible values are 'Detection' and 'Prevention'.
@@ -423,6 +417,14 @@ Description: Indicates whether the WAF Policy is enabled or disabled. Default is
 Type: `bool`
 
 Default: `true`
+
+### <a name="input_location"></a> [location](#input\_location)
+
+Description: The Azure region for this module's resources or telemetry deployment.
+
+Type: `string`
+
+Default: `null`
 
 ### <a name="input_lock"></a> [lock](#input\_lock)
 

@@ -1,9 +1,3 @@
-variable "location" {
-  type        = string
-  description = "The Azure region for this module's resources or telemetry deployment."
-  nullable    = false
-}
-
 variable "mode" {
   type        = string
   description = "The mode of the WAF Policy. Possible values are 'Detection' and 'Prevention'."
@@ -207,6 +201,17 @@ variable "enabled" {
   type        = bool
   default     = true
   description = "Indicates whether the WAF Policy is enabled or disabled. Default is true."
+}
+
+variable "location" {
+  type        = string
+  default     = null
+  description = "The Azure region for this module's resources or telemetry deployment."
+
+  validation {
+    condition     = !var.enable_telemetry || var.location != null
+    error_message = "The location must not be null when telemetry is enabled."
+  }
 }
 
 variable "lock" {
