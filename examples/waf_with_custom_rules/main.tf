@@ -61,7 +61,6 @@ resource "random_string" "suffix" {
 module "test" {
   source = "../.."
 
-  location                          = var.location
   mode                              = "Prevention"
   name                              = "mywafpolicy${random_string.suffix.result}"
   resource_group_name               = azurerm_resource_group.this.name
@@ -115,6 +114,7 @@ module "test" {
     }
   ]
   enable_telemetry           = var.enable_telemetry
+  location                   = var.location
   redirect_url               = "https://learn.microsoft.com/docs/"
   request_body_check_enabled = true
 }
